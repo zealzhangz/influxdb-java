@@ -6,6 +6,8 @@ import org.influxdb.InfluxDB.ResponseFormat;
 import org.influxdb.dto.Pong;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class TestUtils {
@@ -22,6 +24,14 @@ public class TestUtils {
   
   public static String getInfluxIP() {
     return getEnv("INFLUXDB_IP", "127.0.0.1");
+  }
+  
+  public static List<String> getInfluxClusterIP() {
+    return Arrays.asList("127.0.0.1:8086", "127.0.0.2:8086", "127.0.0.3:8086");
+  }
+ 
+  public static boolean ClusterMode() {
+    return System.getenv().containsKey("INFLUXDB_CLUSTER");
   }
   
   public static String getRandomMeasurement() {
@@ -78,7 +88,12 @@ public class TestUtils {
     } else {
       apiUrlToUse = apiUrl;
     }
-    InfluxDB influxDB = InfluxDBFactory.connect(apiUrlToUse, "admin", "admin", clientToUse, responseFormat);
+    InfluxDB influxDB = null;
+    if (ClusterMode()) {
+      influxDB = InfluxDBFactory.connect(apiUrlToUse, "admin", "admin", clientToUse, responseFormat);
+    } else {
+      influxDB = InfluxDBFactory.connect(getInfluxClusterIP(), "admin", "admin", clientToUse, responseFormat);
+    }
     boolean influxDBstarted = false;
     do {
       Pong response;
