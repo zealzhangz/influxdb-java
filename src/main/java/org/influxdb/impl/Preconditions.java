@@ -1,5 +1,7 @@
 package org.influxdb.impl;
 
+import java.util.List;
+
 /**
  * Functions for parameter validation.
  *
@@ -24,6 +26,21 @@ public final class Preconditions {
     return string;
   }
 
+    /**
+   * Enforces that the string is {@linkplain String#isEmpty() not empty}.
+   * @param strings the string to test
+   * @param name variable name for reporting
+   * @return {@code strings}
+   * @throws IllegalArgumentException if the strings is empty
+   */
+  public static List<String> checkNonEmptyString(final List<String> strings, final String name)
+          throws IllegalArgumentException {
+    if (strings == null || strings.isEmpty()) {
+      throw new IllegalArgumentException("Expecting a non-empty string for " + name);
+    }
+    return strings;
+  }
+  
   /**
    * Enforces that the number is larger than 0.
    * @param number the number to test
