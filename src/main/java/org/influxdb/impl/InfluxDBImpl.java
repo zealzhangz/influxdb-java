@@ -45,6 +45,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -52,6 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -79,7 +81,7 @@ public class InfluxDBImpl implements InfluxDB {
    */
   private static final LogLevel LOG_LEVEL = LogLevel.parseLogLevel(System.getProperty(LOG_LEVEL_PROPERTY));
 
-  private final String hostName;
+  private final List<String> hostNames;
   private String version;
   private final Retrofit retrofit;
   private final OkHttpClient client;
@@ -99,7 +101,28 @@ public class InfluxDBImpl implements InfluxDB {
   private final boolean messagePack;
   private Boolean messagePackSupport;
   private final ChunkProccesor chunkProccesor;
+  private final AtomicInteger rrIndex = new AtomicInteger(0);
 
+  /**
+   * Constructs a new {@code InfluxDBImpl}.
+   *
+   * @param urls
+   *          The InfluxDB server API URL
+   * @param username
+   *          The InfluxDB user name
+   * @param password
+   *          The InfluxDB user password
+   * @param okHttpBuilder
+   *          The OkHttp Client Builder
+   * @param responseFormat
+   *          The {@code ResponseFormat} to use for response from InfluxDB
+   *          server
+   */
+  public InfluxDBImpl(final List<String> urls, final String username, final String password,
+                      final OkHttpClient.Builder okHttpBuilder, final ResponseFormat responseFormat) {
+    this(urls, username, password, okHttpBuilder, new Retrofit.Builder(), responseFormat);
+  }
+  
   /**
    * Constructs a new {@code InfluxDBImpl}.
    *
@@ -117,7 +140,7 @@ public class InfluxDBImpl implements InfluxDB {
    */
   public InfluxDBImpl(final String url, final String username, final String password,
                       final OkHttpClient.Builder okHttpBuilder, final ResponseFormat responseFormat) {
-    this(url, username, password, okHttpBuilder, new Retrofit.Builder(), responseFormat);
+    this(Arrays.asList(url), username, password, okHttpBuilder, new Retrofit.Builder(), responseFormat);
   }
 
   /**
@@ -140,8 +163,31 @@ public class InfluxDBImpl implements InfluxDB {
   public InfluxDBImpl(final String url, final String username, final String password,
                       final OkHttpClient.Builder okHttpBuilder, final Retrofit.Builder retrofitBuilder,
                       final ResponseFormat responseFormat) {
+    this(Arrays.asList(url), username, password, okHttpBuilder, retrofitBuilder, responseFormat);
+  }
+  
+  /**
+   * Constructs a new {@code InfluxDBImpl}.
+   *
+   * @param url
+   *          The InfluxDB server API URL
+   * @param username
+   *          The InfluxDB user name
+   * @param password
+   *          The InfluxDB user password
+   * @param okHttpBuilder
+   *          The OkHttp Client Builder
+   * @param retrofitBuilder
+   *          The Retrofit Builder
+   * @param responseFormat
+   *          The {@code ResponseFormat} to use for response from InfluxDB
+   *          server
+   */
+  public InfluxDBImpl(final List<String> urls, final String username, final String password,
+                      final OkHttpClient.Builder okHttpBuilder, final Retrofit.Builder retrofitBuilder,
+                      final ResponseFormat responseFormat) {
     this.messagePack = ResponseFormat.MSGPACK.equals(responseFormat);
-    this.hostName = parseHost(url);
+    this.hostNames = parseHost(urls);
 
     this.loggingInterceptor = new HttpLoggingInterceptor();
     setLogLevel(LOG_LEVEL);
@@ -174,8 +220,12 @@ public class InfluxDBImpl implements InfluxDB {
       break;
     }
 
+    if (urls.size() > 1) {
+      clonedOkHttpBuilder.addInterceptor(new RoundRobinInterceptor(urls));
+    }
+    
     this.client = clonedOkHttpBuilder.build();
-    Retrofit.Builder clonedRetrofitBuilder = retrofitBuilder.baseUrl(url).build().newBuilder();
+    Retrofit.Builder clonedRetrofitBuilder = retrofitBuilder.baseUrl(urls.get(0)).build().newBuilder();
     this.retrofit = clonedRetrofitBuilder.client(this.client)
             .addConverterFactory(converterFactory).build();
     this.influxDBService = this.retrofit.create(InfluxDBService.class);
@@ -183,16 +233,28 @@ public class InfluxDBImpl implements InfluxDB {
   }
 
   public InfluxDBImpl(final String url, final String username, final String password,
-      final OkHttpClient.Builder client) {
+                      final OkHttpClient.Builder client) {
     this(url, username, password, client, ResponseFormat.JSON);
 
   }
+  
+  public InfluxDBImpl(final List<String> urls, final String username, final String password,
+                      final OkHttpClient.Builder client) {
+    this(urls, username, password, client, ResponseFormat.JSON);
+ 
+  }
 
-  InfluxDBImpl(final String url, final String username, final String password, final OkHttpClient.Builder client,
+  InfluxDBImpl(final String url, final String username, final String password,
+               final OkHttpClient.Builder client, final InfluxDBService influxDBService,
+               final JsonAdapter<QueryResult> adapter) {
+    this(Arrays.asList(url), username, password, client, influxDBService, adapter);
+  }
+  
+  InfluxDBImpl(final List<String> urls, final String username, final String password, final OkHttpClient.Builder client,
       final InfluxDBService influxDBService, final JsonAdapter<QueryResult> adapter) {
     super();
     this.messagePack = false;
-    this.hostName = parseHost(url);
+    this.hostNames = parseHost(urls);
 
     this.loggingInterceptor = new HttpLoggingInterceptor();
     setLogLevel(LOG_LEVEL);
@@ -202,8 +264,11 @@ public class InfluxDBImpl implements InfluxDB {
             .addInterceptor(loggingInterceptor)
             .addInterceptor(gzipRequestInterceptor)
             .addInterceptor(new BasicAuthInterceptor(username, password));
+    if (urls.size() > 1) {
+      clonedBuilder.addInterceptor(new RoundRobinInterceptor(urls));
+    }
     this.client = clonedBuilder.build();
-    this.retrofit = new Retrofit.Builder().baseUrl(url)
+    this.retrofit = new Retrofit.Builder().baseUrl(urls.get(0))
         .client(this.client)
         .addConverterFactory(MoshiConverterFactory.create()).build();
     this.influxDBService = influxDBService;
@@ -211,15 +276,29 @@ public class InfluxDBImpl implements InfluxDB {
     chunkProccesor = new JSONChunkProccesor(adapter);
   }
 
-  public InfluxDBImpl(final String url, final String username, final String password, final OkHttpClient.Builder client,
+  public InfluxDBImpl(final String url, final String username, final String password,
+                      final OkHttpClient.Builder client, final String database, final String retentionPolicy,
+                      final ConsistencyLevel consistency) {
+    this(Arrays.asList(url), username, password, client, database, retentionPolicy, consistency);
+  }
+  
+  public InfluxDBImpl(final List<String> urls, final String username, final String password, final OkHttpClient.Builder client,
       final String database, final String retentionPolicy, final ConsistencyLevel consistency) {
-    this(url, username, password, client);
+    this(urls, username, password, client);
 
     setConsistency(consistency);
     setDatabase(database);
     setRetentionPolicy(retentionPolicy);
   }
 
+  private List<String> parseHost(final List<String> urls) {
+    List<String> hostNames = new ArrayList<String>();
+    for (String url : urls) {
+      hostNames.add(parseHost(url));
+    }
+    return hostNames;
+  }
+  
   private String parseHost(final String url) {
     String hostName;
     try {
@@ -523,12 +602,16 @@ public class InfluxDBImpl implements InfluxDB {
     initialDatagramSocket();
     byte[] bytes = records.getBytes(StandardCharsets.UTF_8);
     try {
-        datagramSocket.send(new DatagramPacket(bytes, bytes.length, new InetSocketAddress(hostName, udpPort)));
+        datagramSocket.send(new DatagramPacket(bytes, bytes.length, new InetSocketAddress(roundRobin(), udpPort)));
     } catch (IOException e) {
         throw new InfluxDBIOException(e);
     }
   }
 
+  private String roundRobin() {
+    return this.hostNames.get(rrIndex.getAndIncrement() % this.hostNames.size());
+  }
+  
   private void initialDatagramSocket() {
     if (datagramSocket == null) {
         synchronized (InfluxDBImpl.class) {
