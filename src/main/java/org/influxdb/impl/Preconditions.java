@@ -40,7 +40,7 @@ public final class Preconditions {
     }
     return strings;
   }
-  
+
   /**
    * Enforces that the number is larger than 0.
    * @param number the number to test

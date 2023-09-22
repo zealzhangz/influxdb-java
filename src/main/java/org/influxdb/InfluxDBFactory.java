@@ -35,7 +35,7 @@ public enum InfluxDBFactory {
   /**
    * Create a connection to a InfluxDB.
    *
-   * @param urls 
+   * @param urls
                 the url to connect to.
    * @return a InfluxDB adapter suitable to access a InfluxDB.
    */
@@ -43,7 +43,7 @@ public enum InfluxDBFactory {
         Preconditions.checkNonEmptyString(urls, "urls");
         return new InfluxDBImpl(urls, null, null, new OkHttpClient.Builder());
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *
@@ -61,15 +61,15 @@ public enum InfluxDBFactory {
     Preconditions.checkNonEmptyString(username, "username");
     return new InfluxDBImpl(Arrays.asList(url), username, password, new OkHttpClient.Builder());
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *
-   * @param urls     
+   * @param urls
                 the urls to connect to.
-   * @param username 
+   * @param username
                 the username which is used to authorize against the influxDB instance.
-   * @param password 
+   * @param password
                 the password for the username which is used to authorize against the influxDB instance.
    * @return a InfluxDB adapter suitable to access a InfluxDB.
    */
@@ -78,7 +78,7 @@ public enum InfluxDBFactory {
         Preconditions.checkNonEmptyString(username, "username");
         return new InfluxDBImpl(urls, username, password, new OkHttpClient.Builder());
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *
@@ -93,7 +93,7 @@ public enum InfluxDBFactory {
     Objects.requireNonNull(client, "client");
     return new InfluxDBImpl(Arrays.asList(url), null, null, client);
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *
@@ -106,7 +106,7 @@ public enum InfluxDBFactory {
         Objects.requireNonNull(client, "client");
         return new InfluxDBImpl(urls, null, null, client);
   }
-  
+
 
   /**
    * Create a connection to a InfluxDB.
@@ -126,7 +126,7 @@ public enum InfluxDBFactory {
       final OkHttpClient.Builder client) {
     return connect(url, username, password, client, ResponseFormat.JSON);
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *
@@ -165,7 +165,7 @@ public enum InfluxDBFactory {
     Objects.requireNonNull(client, "client");
     return new InfluxDBImpl(Arrays.asList(url), username, password, client, responseFormat);
   }
-  
+
   /**
    * Create a connection to a InfluxDB.
    *

@@ -122,7 +122,7 @@ public class InfluxDBImpl implements InfluxDB {
                       final OkHttpClient.Builder okHttpBuilder, final ResponseFormat responseFormat) {
     this(urls, username, password, okHttpBuilder, new Retrofit.Builder(), responseFormat);
   }
-  
+
   /**
    * Constructs a new {@code InfluxDBImpl}.
    *
@@ -165,11 +165,11 @@ public class InfluxDBImpl implements InfluxDB {
                       final ResponseFormat responseFormat) {
     this(Arrays.asList(url), username, password, okHttpBuilder, retrofitBuilder, responseFormat);
   }
-  
+
   /**
    * Constructs a new {@code InfluxDBImpl}.
    *
-   * @param url
+   * @param urls
    *          The InfluxDB server API URL
    * @param username
    *          The InfluxDB user name
@@ -223,7 +223,7 @@ public class InfluxDBImpl implements InfluxDB {
     if (urls.size() > 1) {
       clonedOkHttpBuilder.addInterceptor(new RoundRobinInterceptor(urls));
     }
-    
+
     this.client = clonedOkHttpBuilder.build();
     Retrofit.Builder clonedRetrofitBuilder = retrofitBuilder.baseUrl(urls.get(0)).build().newBuilder();
     this.retrofit = clonedRetrofitBuilder.client(this.client)
@@ -237,11 +237,11 @@ public class InfluxDBImpl implements InfluxDB {
     this(url, username, password, client, ResponseFormat.JSON);
 
   }
-  
+
   public InfluxDBImpl(final List<String> urls, final String username, final String password,
                       final OkHttpClient.Builder client) {
     this(urls, username, password, client, ResponseFormat.JSON);
- 
+
   }
 
   InfluxDBImpl(final String url, final String username, final String password,
@@ -249,7 +249,7 @@ public class InfluxDBImpl implements InfluxDB {
                final JsonAdapter<QueryResult> adapter) {
     this(Arrays.asList(url), username, password, client, influxDBService, adapter);
   }
-  
+
   InfluxDBImpl(final List<String> urls, final String username, final String password, final OkHttpClient.Builder client,
       final InfluxDBService influxDBService, final JsonAdapter<QueryResult> adapter) {
     super();
@@ -281,8 +281,9 @@ public class InfluxDBImpl implements InfluxDB {
                       final ConsistencyLevel consistency) {
     this(Arrays.asList(url), username, password, client, database, retentionPolicy, consistency);
   }
-  
-  public InfluxDBImpl(final List<String> urls, final String username, final String password, final OkHttpClient.Builder client,
+
+  public InfluxDBImpl(final List<String> urls, final String username, final String password,
+                      final OkHttpClient.Builder client,
       final String database, final String retentionPolicy, final ConsistencyLevel consistency) {
     this(urls, username, password, client);
 
@@ -298,7 +299,7 @@ public class InfluxDBImpl implements InfluxDB {
     }
     return hostNames;
   }
-  
+
   private String parseHost(final String url) {
     String hostName;
     try {
@@ -611,7 +612,7 @@ public class InfluxDBImpl implements InfluxDB {
   private String roundRobin() {
     return this.hostNames.get(rrIndex.getAndIncrement() % this.hostNames.size());
   }
-  
+
   private void initialDatagramSocket() {
     if (datagramSocket == null) {
         synchronized (InfluxDBImpl.class) {
